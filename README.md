@@ -21,9 +21,11 @@ Wieloetapowe budowanie obrazów (Multi-stage build). Aplikacja wyświetla:
 <img width="791" height="337" alt="image" src="https://github.com/user-attachments/assets/bce600f5-4ffc-4ff3-aaa9-8887c48e7bc3" />
 
 ### 1. Budowa obrazu z przekazaniem zmiennej VERSION
+
 <img width="1248" height="561" alt="image" src="https://github.com/user-attachments/assets/82da5518-fb1d-495d-aa5a-4c2180c0fed9" />
+
 Użyto polecenia:
+
 ```bash
 docker build --build-arg VERSION=release-3 -t lab5-web .
-```
 
