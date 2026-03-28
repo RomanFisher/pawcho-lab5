@@ -25,4 +25,5 @@ Wieloetapowe budowanie obrazów (Multi-stage build). Aplikacja wyświetla:
 Użyto polecenia:
 ```bash
 docker build --build-arg VERSION=release-3 -t lab5-web .
+```
 
