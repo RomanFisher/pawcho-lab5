@@ -46,5 +46,5 @@ Gotowy obraz został również opublikowany w publicznym rejestrze Docker Hub.
 Można go pobrać i uruchomić na dowolnym komputerze za pomocą poniższego polecenia:
 
 ```bash
-docker pull ТВІЙ_ЛОГІН/lab5-web:release-3
-docker run -d -p 8080:80 --name my_app ТВІЙ_ЛОГІН/lab5-web:release-3
+docker pull romanfisher/lab5-web:release-3
+docker run -d -p 8080:80 --name my_app romanfisher/lab5-web:release-3
