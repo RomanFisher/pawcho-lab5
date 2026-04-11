@@ -1,50 +1,127 @@
-# PAwChO - Laboratorium 5
+# PAwChO - Laboratorium 6
 
 **Wykonał:** Roman Rybak  
 **Grupa:** IO 6.7  
 
-## Cel zadania
-Wieloetapowe budowanie obrazów (Multi-stage build). Aplikacja wyświetla:
-* Adres IP serwera (generowany dynamicznie przez Nginx SSI)
-* Nazwę serwera / hostname (generowany dynamicznie)
-* Wersję aplikacji (przekazywaną przez `ARG` podczas budowania)
-* Automatyczną kontrolę poprawności działania aplikacji (`HEALTHCHECK`)
+---
 
-## Struktura plików
-* `Dockerfile` - plik konfiguracyjny (`scratch`, `nginx:alpine`).
-* `alpine-minirootfs-3.21.3-x86_64.tar.gz` - minimalny system plików wykorzystany w etapie builder.
+## Cel zadania
+
+Zaawansowane mechanizmy budowania obrazów Docker (BuildKit, SSH, GHCR).  
+Celem było skonfigurowanie procesu budowania obrazu z wykorzystaniem:
+- BuildKit
+- SSH 
+- integracji z GitHub Container Registry (GHCR)
 
 ---
 
-## Wyniki działania 
-<img width="1246" height="461" alt="image" src="https://github.com/user-attachments/assets/906cda7a-1a88-45df-904c-4b389f91e498" />
-<img width="791" height="337" alt="image" src="https://github.com/user-attachments/assets/bce600f5-4ffc-4ff3-aaa9-8887c48e7bc3" />
+## Kluczowe funkcjonalności
 
-### Konfiguracja Dockerfile i struktura plików
+* Bezpieczne klonowanie repozytorium (`--mount=type=ssh`)
+* Multi-stage build (cloner → builder → final)
+* Publikacja obrazu do GHCR
+* Uruchomienie i test aplikacji lokalnie
 
-<img width="1619" height="939" alt="image" src="https://github.com/user-attachments/assets/5e254a91-17ab-4b5f-ba92-fdb44f23da6f" />
+---
 
-Zrzut ekranu pokazujący otwarty plik `Dockerfile` w środowisku Visual Studio Code oraz widok eksploratora plików po lewej stronie. Widać poprawną organizację plików projektu, w tym obecność archiwum systemu plików Alpine.
+##  Dockerfile – konfiguracja aplikacji
 
-### Budowa obrazu z przekazaniem zmiennej VERSION
+```dockerfile
+# syntax=docker/dockerfile:1.2
 
-<img width="1248" height="561" alt="image" src="https://github.com/user-attachments/assets/82da5518-fb1d-495d-aa5a-4c2180c0fed9" />
+FROM alpine/git AS cloner
+WORKDIR /repo
+RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+RUN --mount=type=ssh git clone git@github.com:RomanFisher/pawcho6.git .
 
-Użyto polecenia:
+FROM alpine AS builder
+COPY --from=cloner /repo/alpine-minirootfs-3.21.3-x86_64.tar.gz /
+ARG VERSION=v1.0.0
+WORKDIR /app
+
+RUN echo "<!DOCTYPE html><html><body>" > index.html && \
+    echo "<h2>PAwChO - Laboratorium 6</h2>" >> index.html && \
+    echo "<h3>Wykonal: Roman Rybak, Grupa: IO 6.7</h3>" >> index.html && \
+    echo "<hr>" >> index.html && \
+    echo "<p>Wersja aplikacji: ${VERSION}</p>" >> index.html && \
+    echo "<p>Hostname serwera: </p>" >> index.html && \
+    echo "<p>Adres IP serwera: </p>" >> index.html && \
+    echo "</body></html>" >> index.html
+
+FROM nginx:alpine
+
+LABEL org.opencontainers.image.source="https://github.com/RomanFisher/pawcho6"
+LABEL org.opencontainers.image.description="Aplikacja z laboratorium 6 zbudowana przez BuildKit i SSH"
+
+RUN apk add --update curl && rm -rf /var/cache/apk/*
+COPY --from=builder /app/index.html /usr/share/nginx/html/index.html
+
+RUN echo "server {" > /etc/nginx/conf.d/default.conf && \
+    echo "    listen 80;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    location / {" >> /etc/nginx/conf.d/default.conf && \
+    echo "        root /usr/share/nginx/html;" >> /etc/nginx/conf.d/default.conf && \
+    echo "        index index.html;" >> /etc/nginx/conf.d/default.conf && \
+    echo "        ssi on;" >> /etc/nginx/conf.d/default.conf && \
+    echo "    }" >> /etc/nginx/conf.d/default.conf && \
+    echo "}" >> /etc/nginx/conf.d/default.conf
+
+HEALTHCHECK --interval=10s --timeout=3s \
+  CMD curl -f http://localhost/ || exit 1
+
+EXPOSE 80
+```
+
+
+---
+
+## Budowanie obrazu (Docker BuildKit)
+
+<img width="1176" height="231" alt="image" src="https://github.com/user-attachments/assets/dfe32823-ed93-4ed2-b84a-fb73b31b4859" />
 
 ```bash
-docker build --build-arg VERSION=release-3 -t lab5-web .
-
+docker build --ssh default \
+  --build-arg VERSION=lab6-final \
+  -t ghcr.io/romanfisher/pawcho6:lab6 .
 ```
 
 ---
 
-## Repozytorium Docker Hub
+## Publikacja obrazu w GHCR
 
-Gotowy obraz został również opublikowany w publicznym rejestrze Docker Hub. 
-
-Można go pobrać i uruchomić na dowolnym komputerze za pomocą poniższego polecenia:
+<img width="889" height="338" alt="image" src="https://github.com/user-attachments/assets/357b8734-7ce6-463c-8abf-ec025d9e0690" />
 
 ```bash
-docker pull romanfisher/lab5-web:release-3
-docker run -d -p 8080:80 --name my_app romanfisher/lab5-web:release-3
+docker push ghcr.io/romanfisher/pawcho6:lab6
+```
+
+
+---
+
+## Uruchomienie kontenera
+
+<img width="974" height="69" alt="image" src="https://github.com/user-attachments/assets/b41730ff-4a9a-4e7d-b5b8-d5a81c7098d9" />
+<img width="570" height="261" alt="image" src="https://github.com/user-attachments/assets/31eefea0-76ef-48b3-b705-c99f3f688441" />
+
+
+```bash
+docker run -d -p 8080:80 --name lab6_final ghcr.io/romanfisher/pawcho6:lab6
+```
+
+
+---
+
+## Widoczność w GitHub Packages
+
+Obraz został poprawnie opublikowany i jest dostępny w GHCR.
+
+<img width="1349" height="926" alt="image" src="https://github.com/user-attachments/assets/9d73d53f-134c-4d16-b32c-4ac533531759" />
+
+---
+
+## Linki do zasobów
+
+- Repozytorium GitHub:  
+  https://github.com/RomanFisher/pawcho6
+
+- Pakiet w GHCR:  
+  https://github.com/RomanFisher/pawcho6/pkgs/container/pawcho6
